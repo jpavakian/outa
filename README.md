@@ -1,6 +1,6 @@
-# FocusPulse — Pomodoro Timer & Focus Companion
+# OUTA (قوطة) — Pomodoro Timer & Focus Companion
 
-> A minimalist, responsive, mobile-first Pomodoro web application featuring procedural Web Audio soundscapes, screen wake-lock, task management, and offline PWA capability.
+> A minimalist, responsive, mobile-first Pomodoro web application named after the beloved Egyptian word for tomato ("قوطة"). Features procedural Web Audio soundscapes, screen wake-lock, task management, and offline PWA capability.
 
 ---
 
@@ -37,11 +37,11 @@
 
 ## 🚀 Setup & Integration
 
-FocusPulse is completely self-contained in a single HTML file with no build pipeline required.
+OUTA is completely self-contained in a single HTML file with no build pipeline required.
 
 ### 1. Link Assets in HTML <head>
 ```html
-<!-- FocusPulse Favicons -->
+<!-- OUTA Favicons -->
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">

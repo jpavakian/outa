@@ -1,6 +1,6 @@
 {
-  "name": "FocusPulse Pomodoro Timer",
-  "short_name": "FocusPulse",
+  "name": "OUTA Pomodoro Timer",
+  "short_name": "OUTA",
   "description": "Minimalist, mobile-first Pomodoro timer with procedural ambient soundscapes and task tracking.",
   "start_url": "./index.html",
   "display": "standalone",
