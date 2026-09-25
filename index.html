@@ -1,0 +1,1860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a">
+  <title>FocusPulse - Pomodoro Timer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='58' rx='38' ry='33' fill='%23ef4444'/%3E%3Cpath d='M48 28 C46 17 54 15 54 15 C51 21 52 28 52 28 Z M50 28 C34 21 28 27 28 27 C37 33 50 29 50 29 Z M50 28 C66 21 72 27 72 27 C63 33 50 29 50 29 Z' fill='%2310b981'/%3E%3Cpath d='M22 59 L36 59 L42 47 L48 69 L54 52 L60 62 L64 59 L78 59' fill='none' stroke='%23ffffff' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            pomodoro: {
+              DEFAULT: '#ef4444',
+              soft: '#fee2e2',
+              glow: 'rgba(239, 68, 68, 0.35)',
+              accent: '#dc2626'
+            },
+            shortBreak: {
+              DEFAULT: '#10b981',
+              soft: '#d1fae5',
+              glow: 'rgba(16, 185, 129, 0.35)',
+              accent: '#059669'
+            },
+            longBreak: {
+              DEFAULT: '#3b82f6',
+              soft: '#dbeafe',
+              glow: 'rgba(59, 130, 246, 0.35)',
+              accent: '#2563eb'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Mobile-optimized smooth touch behavior and safe areas */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      touch-action: manipulation;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+    
+    .timer-ring-circle {
+      transition: stroke-dashoffset 0.85s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+
+    .pulse-subtle {
+      animation: pulseGlow 2.5s infinite ease-in-out;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.018); opacity: 1; }
+    }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 9999px;
+    }
+
+    /* Glassmorphism utility */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .glass-card-light {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+
+    .tabular-timer {
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col font-sans transition-colors duration-500 overflow-x-hidden pb-8 sm:pb-12">
+
+  <header class="w-full max-w-xl mx-auto pt-safe px-4 pt-4 sm:pt-6 pb-2 flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <div id="modeIconBadge" class="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center ring-1 ring-red-500/30 transition-all duration-300">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <div>
+        <span class="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
+          FocusPulse
+          <span id="streakBadge" class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold flex items-center gap-1">
+            🔥 <span id="streakCount">0</span>
+          </span>
+        </span>
+        <p id="subStatusText" class="text-xs text-slate-400 font-medium">Ready to focus</p>
+      </div>
+    </div>
+
+    <!-- Quick action toggles -->
+    <div class="flex items-center gap-1.5">
+      <!-- Ambient Noise Button -->
+      <button id="ambientBtn" class="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition active:scale-95 relative" title="Ambient Focus Sound">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+        </svg>
+        <span id="ambientIndicator" class="hidden absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+      </button>
+
+      <!-- Wake Lock Indicator Button -->
+      <button id="wakeLockBtn" class="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition active:scale-95" title="Screen Stay Awake">
+        <svg id="wakeLockIcon" class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      </button>
+
+      <!-- Favicons & README Asset Pack ZIP Button -->
+      <button id="packageModalBtn" class="p-2 sm:px-3 sm:py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 hover:text-white border border-red-500/30 transition active:scale-95 flex items-center gap-1.5" title="Download Favicons, Manifest & README ZIP">
+        <svg class="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        <span class="text-xs font-semibold hidden sm:inline">ZIP Pack</span>
+      </button>
+
+      <!-- Settings button -->
+      <button id="openSettingsBtn" class="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition active:scale-95" title="Settings">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="w-full max-w-xl mx-auto px-4 flex-1 flex flex-col justify-start items-center gap-5 mt-2">
+    <!-- Mode Selector Pills -->
+    <div class="w-full bg-slate-900/90 p-1.5 rounded-2xl flex items-center justify-between border border-slate-800/80 shadow-lg shadow-black/20">
+      <button data-mode="pomodoro" class="mode-tab flex-1 py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 text-white bg-red-600 shadow-sm">
+        Focus
+      </button>
+      <button data-mode="shortBreak" class="mode-tab flex-1 py-2.5 px-3 text-xs sm:text-sm font-medium rounded-xl text-slate-400 hover:text-slate-200 transition-all duration-200">
+        Short Break
+      </button>
+      <button data-mode="longBreak" class="mode-tab flex-1 py-2.5 px-3 text-xs sm:text-sm font-medium rounded-xl text-slate-400 hover:text-slate-200 transition-all duration-200">
+        Long Break
+      </button>
+    </div>
+
+    <div class="relative w-64 h-64 sm:w-72 sm:h-72 my-1 flex items-center justify-center">
+      <!-- Glow effect -->
+      <div id="timerGlow" class="absolute inset-4 rounded-full bg-red-500/15 blur-2xl -z-10 transition-all duration-700"></div>
+
+      <!-- SVG Ring -->
+      <svg class="w-full h-full transform -rotate-90" viewBox="0 0 260 260">
+        <!-- Background Track -->
+        <circle
+          cx="130"
+          cy="130"
+          r="110"
+          stroke="rgba(30, 41, 59, 0.85)"
+          stroke-width="12"
+          fill="none"
+          stroke-linecap="round"
+        />
+        <!-- Active Progress Ring -->
+        <circle
+          id="progressCircle"
+          class="timer-ring-circle"
+          cx="130"
+          cy="130"
+          r="110"
+          stroke="#ef4444"
+          stroke-width="12"
+          stroke-linecap="round"
+          fill="none"
+          stroke-dasharray="691.15"
+          stroke-dashoffset="0"
+        />
+      </svg>
+
+      <!-- Center Time & Controls -->
+      <div class="absolute inset-0 flex flex-col items-center justify-center text-center select-none px-4">
+        <!-- Current mode caption -->
+        <span id="timerLabel" class="text-xs tracking-wider uppercase font-bold text-red-400 mb-1 transition-colors">
+          Focus Session
+        </span>
+
+        <!-- Digital Numbers -->
+        <div id="timeDisplay" class="font-mono text-5xl sm:text-6xl font-bold tracking-tighter text-white tabular-timer drop-shadow">
+          25:00
+        </div>
+
+        <!-- Active Task tag -->
+        <div id="activeTaskDisplay" class="mt-2.5 max-w-[200px] truncate text-xs text-slate-400 font-medium px-2.5 py-1 rounded-full bg-slate-900/80 border border-slate-800 flex items-center gap-1.5 cursor-pointer hover:border-slate-700">
+          <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+          <span id="activeTaskText" class="truncate">Select a task</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-slate-400 font-medium mr-1">Round:</span>
+      <div id="cycleDots" class="flex items-center gap-1.5">
+        <!-- 4 dots for typical pomodoro set -->
+        <div class="w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-red-500/20"></div>
+        <div class="w-2.5 h-2.5 rounded-full bg-slate-800"></div>
+        <div class="w-2.5 h-2.5 rounded-full bg-slate-800"></div>
+        <div class="w-2.5 h-2.5 rounded-full bg-slate-800"></div>
+      </div>
+      <span id="sessionCounter" class="text-xs font-mono text-slate-400 ml-1.5">#1</span>
+    </div>
+
+    <div class="w-full flex items-center justify-center gap-4 mt-1">
+      <!-- Reset button -->
+      <button id="resetBtn" class="p-3.5 rounded-2xl bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 active:scale-95 transition" title="Reset Session">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
+
+      <!-- Main Play/Pause Button (Large Touch Target for Mobile) -->
+      <button id="playPauseBtn" class="px-9 py-4 rounded-2xl bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold text-lg flex items-center gap-3 shadow-lg shadow-red-600/30 transition duration-150">
+        <svg id="playIcon" class="w-6 h-6 fill-current" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+        <svg id="pauseIcon" class="w-6 h-6 fill-current hidden" viewBox="0 0 24 24">
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+        </svg>
+        <span id="playPauseText">Start</span>
+      </button>
+
+      <!-- Skip session button -->
+      <button id="skipBtn" class="p-3.5 rounded-2xl bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 active:scale-95 transition" title="Skip to Next">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="w-full bg-slate-900/60 rounded-3xl border border-slate-800/80 p-4 sm:p-5 mt-2 flex flex-col gap-3 shadow-lg">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <h2 class="text-sm font-bold text-slate-200 tracking-tight flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            Tasks
+          </h2>
+          <span id="taskCountBadge" class="text-[11px] px-2 py-0.2 rounded-full bg-slate-800 text-slate-400 font-semibold">0</span>
+        </div>
+        <button id="addTaskTrigger" class="text-xs text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 transition">
+          + Add Task
+        </button>
+      </div>
+
+      <!-- Add Task Input Form (Expandable) -->
+      <form id="taskForm" class="hidden flex-col gap-2.5 p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+        <input 
+          id="taskTitleInput" 
+          type="text" 
+          placeholder="What are you working on?" 
+          maxlength="80" 
+          required 
+          class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+        />
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400 font-medium">Est. Pomodoros:</label>
+            <input 
+              id="taskEstInput" 
+              type="number" 
+              min="1" 
+              max="20" 
+              value="2" 
+              class="w-14 bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-1 text-xs text-center text-white focus:outline-none focus:border-red-500 font-mono"
+            />
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" id="cancelTaskBtn" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white rounded-lg">
+              Cancel
+            </button>
+            <button type="submit" class="px-3.5 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg shadow-sm">
+              Save Task
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <!-- Task List Container -->
+      <div id="taskList" class="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1">
+        <!-- Empty placeholder -->
+        <div id="emptyTaskState" class="text-center py-6 text-slate-500 text-xs">
+          No tasks added yet. Add one to track your focus sessions!
+        </div>
+      </div>
+    </div>
+
+    <div class="w-full grid grid-cols-3 gap-2.5 mt-1">
+      <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80 text-center">
+        <p class="text-[11px] text-slate-400 font-medium">Focus Time</p>
+        <p id="totalFocusMinutes" class="text-lg font-bold text-white font-mono mt-0.5">0m</p>
+      </div>
+      <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80 text-center">
+        <p class="text-[11px] text-slate-400 font-medium">Finished</p>
+        <p id="totalPomosCount" class="text-lg font-bold text-red-400 font-mono mt-0.5">0</p>
+      </div>
+      <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80 text-center">
+        <p class="text-[11px] text-slate-400 font-medium">Daily Streak</p>
+        <p id="statsStreakCount" class="text-lg font-bold text-amber-400 font-mono mt-0.5">0d</p>
+      </div>
+    </div>
+  </main>
+
+  <div id="ambientDrawer" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
+    <div class="w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+          </svg>
+          <h3 class="font-bold text-white text-base">Synthesized Ambient Audio</h3>
+        </div>
+        <button id="closeAmbientBtn" class="p-1.5 rounded-lg text-slate-400 hover:text-white">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-400">
+        Pure procedural sound synthesized in real-time using the Web Audio API. Zero internet data required.
+      </p>
+
+      <div class="grid grid-cols-2 gap-2.5">
+        <button data-sound="none" class="ambient-option py-3 px-3 rounded-xl border border-slate-700 bg-slate-800 text-xs font-semibold text-white flex items-center justify-center gap-2 active:scale-95">
+          🔇 Off
+        </button>
+        <button data-sound="brownian" class="ambient-option py-3 px-3 rounded-xl border border-slate-800 bg-slate-950 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-2 active:scale-95">
+          🌊 Deep Brown Noise
+        </button>
+        <button data-sound="pink" class="ambient-option py-3 px-3 rounded-xl border border-slate-800 bg-slate-950 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-2 active:scale-95">
+          🌧️ Soft Rain Wash
+        </button>
+        <button data-sound="binaural" class="ambient-option py-3 px-3 rounded-xl border border-slate-800 bg-slate-950 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-2 active:scale-95">
+          🧘 432Hz Calm Drone
+        </button>
+      </div>
+
+      <div class="space-y-1 mt-2">
+        <div class="flex justify-between text-xs text-slate-400">
+          <span>Ambient Volume</span>
+          <span id="ambientVolumeLabel">40%</span>
+        </div>
+        <input id="ambientVolume" type="range" min="0" max="100" value="40" class="w-full accent-emerald-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg">
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-5 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="font-bold text-white text-base flex items-center gap-2">
+          <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+          Timer Settings
+        </h3>
+        <button id="closeSettingsBtn" class="p-1 rounded-lg text-slate-400 hover:text-white">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Time duration settings -->
+      <div class="space-y-3">
+        <label class="text-xs font-bold text-slate-300 uppercase tracking-wider">Durations (minutes)</label>
+        <div class="grid grid-cols-3 gap-2.5">
+          <div class="flex flex-col gap-1">
+            <span class="text-xs text-slate-400">Focus</span>
+            <input id="settingFocusTime" type="number" min="1" max="90" value="25" class="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-center text-sm font-mono text-white focus:outline-none focus:border-red-500">
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-xs text-slate-400">Short Break</span>
+            <input id="settingShortBreakTime" type="number" min="1" max="30" value="5" class="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-center text-sm font-mono text-white focus:outline-none focus:border-emerald-500">
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-xs text-slate-400">Long Break</span>
+            <input id="settingLongBreakTime" type="number" min="1" max="60" value="15" class="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-center text-sm font-mono text-white focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto start & Cycle configs -->
+      <div class="space-y-3 pt-2 border-t border-slate-800/80">
+        <label class="text-xs font-bold text-slate-300 uppercase tracking-wider">Preferences</label>
+        
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-300">Auto-start Breaks</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input id="settingAutoBreaks" type="checkbox" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-300">Auto-start Focus Sessions</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input id="settingAutoPomodoros" type="checkbox" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-300">Haptic Vibration (Mobile)</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input id="settingVibrate" type="checkbox" checked class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-300">Ticking Sound</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input id="settingTicking" type="checkbox" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Notification button -->
+      <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-300 font-medium">Browser Notifications</p>
+          <p class="text-[11px] text-slate-500">Alerts when running in background</p>
+        </div>
+        <button id="reqNotificationBtn" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-lg transition">
+          Enable
+        </button>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+        <button id="saveSettingsBtn" class="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-sm rounded-xl transition shadow">
+          Apply Settings
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Asset Pack & README Modal -->
+  <div id="packageModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center ring-1 ring-red-500/30">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Favicons, Manifest & README Pack</h3>
+            <p class="text-xs text-slate-400">Complete production assets bundled in a single ZIP</p>
+          </div>
+        </div>
+        <button id="closePackageBtn" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Icon Preview Strip -->
+      <div class="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 flex items-center justify-between gap-2 overflow-x-auto">
+        <div class="flex items-center gap-2">
+          <canvas id="previewIconCanvas" width="48" height="48" class="w-12 h-12 rounded-xl border border-slate-700/80 shadow-inner flex-shrink-0"></canvas>
+          <div>
+            <p class="text-xs font-bold text-white">Generated Favicon Set</p>
+            <p class="text-[11px] text-slate-400">Vector SVG + 5 PNG sizes + ICO</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">16×16</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">32×32</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">180×180</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">512×512</span>
+        </div>
+      </div>
+
+      <!-- Included Assets List -->
+      <div class="space-y-1.5 text-xs text-slate-300">
+        <p class="font-semibold text-slate-400 uppercase text-[10px] tracking-wider">Included in focuspulse-assets.zip:</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+          <div class="p-2 rounded-xl bg-slate-950/50 border border-slate-800/80 flex items-center gap-2">
+            <span>🎨</span>
+            <span class="truncate font-mono">favicon.svg</span>
+            <span class="ml-auto text-[10px] text-slate-500">Vector</span>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-950/50 border border-slate-800/80 flex items-center gap-2">
+            <span>🖼️</span>
+            <span class="truncate font-mono">favicon.ico</span>
+            <span class="ml-auto text-[10px] text-slate-500">32x32</span>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-950/50 border border-slate-800/80 flex items-center gap-2">
+            <span>📱</span>
+            <span class="truncate font-mono">apple-touch-icon.png</span>
+            <span class="ml-auto text-[10px] text-slate-500">180x180</span>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-950/50 border border-slate-800/80 flex items-center gap-2">
+            <span>🤖</span>
+            <span class="truncate font-mono">android-chrome-512.png</span>
+            <span class="ml-auto text-[10px] text-slate-500">512x512</span>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-950/50 border border-slate-800/80 flex items-center gap-2">
+            <span>⚙️</span>
+            <span class="truncate font-mono">site.webmanifest</span>
+            <span class="ml-auto text-[10px] text-slate-500">PWA Meta</span>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-950/50 border border-slate-800/80 flex items-center gap-2">
+            <span>📖</span>
+            <span class="truncate font-mono">README.md</span>
+            <span class="ml-auto text-[10px] text-slate-500">Guide</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
+        <button id="downloadZipDirectBtn" class="w-full sm:flex-1 py-3 px-4 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold text-sm rounded-xl transition shadow-lg shadow-red-600/30 flex items-center justify-center gap-2">
+          <svg id="downloadZipSpinner" class="w-4 h-4 animate-spin hidden" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <svg id="downloadZipIcon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span>Download All (.ZIP)</span>
+        </button>
+        <button id="toggleReadmePreviewBtn" class="w-full sm:w-auto py-3 px-4 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 font-semibold text-sm rounded-xl transition flex items-center justify-center gap-2">
+          <span>📖 View README</span>
+        </button>
+      </div>
+
+      <!-- Expandable README Preview -->
+      <div id="readmePreviewContainer" class="hidden flex-col gap-2 pt-2 border-t border-slate-800">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-300">README.md Preview</span>
+          <button id="copyReadmeBtn" class="text-xs text-red-400 hover:text-red-300 font-semibold px-2.5 py-1 rounded bg-slate-800 border border-slate-700 hover:border-slate-600 transition flex items-center gap-1">
+            📋 Copy Markdown
+          </button>
+        </div>
+        <pre id="readmeContentBlock" class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-[11px] font-mono text-slate-300 overflow-x-auto max-h-48 whitespace-pre-wrap leading-relaxed select-text"></pre>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-2xl bg-slate-800/95 border border-slate-700 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 pointer-events-none opacity-0 transition-opacity duration-300 z-50">
+    <span id="toastIcon">✨</span>
+    <span id="toastMsg">Ready!</span>
+  </div>
+
+  <script>
+    /* Audio synthesizer using standard Web Audio API */
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.ambientGain = null;
+        this.ambientSource = null;
+        this.ambientType = 'none';
+        this.isTicking = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            this.ctx = new AudioContextClass();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      /* Gentle singing bowl / chime for session completion */
+      playBell() {
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const freqs = [528, 1056, 1584]; // Harmonious Solfeggio 528Hz frequency
+        
+        freqs.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          
+          osc.type = idx === 0 ? 'sine' : 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+
+          const volume = idx === 0 ? 0.35 : 0.12;
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(volume, now + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.8);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start(now);
+          osc.stop(now + 3.0);
+        });
+      }
+
+      /* Subtle tactile click for timer ticks */
+      playTick() {
+        if (!this.ctx || !state.settings.ticking) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, now);
+        gain.gain.setValueAtTime(0.015, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.04);
+      }
+
+      /* Ambient noise generator (Brownian noise, Rain, Binaural) */
+      setAmbient(type, volume = 0.4) {
+        this.init();
+        if (!this.ctx) return;
+        this.stopAmbient();
+        this.ambientType = type;
+
+        if (type === 'none') return;
+
+        const bufferSize = 2 * this.ctx.sampleRate;
+        const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+
+        if (type === 'brownian') {
+          let lastOut = 0.0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            output[i] = (lastOut + (0.02 * white)) / 1.02;
+            lastOut = output[i];
+            output[i] *= 3.5;
+          }
+        } else if (type === 'pink') {
+          let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+            output[i] *= 0.11;
+            b6 = white * 0.115926;
+          }
+        } else if (type === 'binaural') {
+          // Continuous 432 Hz calming tone with gentle low-frequency hum
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(108, this.ctx.currentTime); // Low fundamental
+          gain.gain.setValueAtTime(volume * 0.18, this.ctx.currentTime);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          this.ambientSource = osc;
+          this.ambientGain = gain;
+          return;
+        }
+
+        const whiteNoise = this.ctx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        whiteNoise.loop = true;
+
+        const gainNode = this.ctx.createGain();
+        gainNode.gain.setValueAtTime(volume * 0.3, this.ctx.currentTime);
+
+        whiteNoise.connect(gainNode);
+        gainNode.connect(this.ctx.destination);
+        whiteNoise.start();
+
+        this.ambientSource = whiteNoise;
+        this.ambientGain = gainNode;
+      }
+
+      setAmbientVolume(vol) {
+        if (this.ambientGain && this.ctx) {
+          this.ambientGain.gain.setValueAtTime(vol * 0.3, this.ctx.currentTime);
+        }
+      }
+
+      stopAmbient() {
+        if (this.ambientSource) {
+          try {
+            this.ambientSource.stop();
+            this.ambientSource.disconnect();
+          } catch(e) {}
+          this.ambientSource = null;
+        }
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    const DEFAULT_SETTINGS = {
+      focusTime: 25,
+      shortBreakTime: 5,
+      longBreakTime: 15,
+      longBreakInterval: 4,
+      autoStartBreaks: false,
+      autoStartPomodoros: false,
+      vibrate: true,
+      ticking: false,
+      ambientVolume: 0.4
+    };
+
+    const state = {
+      mode: 'pomodoro', // 'pomodoro', 'shortBreak', 'longBreak'
+      timeLeft: 25 * 60,
+      totalDuration: 25 * 60,
+      isRunning: false,
+      intervalId: null,
+      currentCycle: 1,
+      totalCompletedPomodoros: 0,
+      totalFocusMinutes: 0,
+      streak: 1,
+      lastActiveDate: new Date().toDateString(),
+      activeTaskId: null,
+      wakeLockSentinel: null,
+      wakeLockSupported: true,
+      tasks: [],
+      settings: { ...DEFAULT_SETTINGS }
+    };
+
+    function loadPersistedData() {
+      try {
+        const savedSettings = localStorage.getItem('fp_settings');
+        if (savedSettings) state.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) };
+
+        const savedTasks = localStorage.getItem('fp_tasks');
+        if (savedTasks) state.tasks = JSON.parse(savedTasks);
+
+        const savedStats = localStorage.getItem('fp_stats');
+        if (savedStats) {
+          const stats = JSON.parse(savedStats);
+          state.totalCompletedPomodoros = stats.completed || 0;
+          state.totalFocusMinutes = stats.focusMinutes || 0;
+          state.streak = stats.streak || 1;
+          state.lastActiveDate = stats.lastDate || new Date().toDateString();
+
+          // Check streak continuity
+          const today = new Date().toDateString();
+          const yesterday = new Date(Date.now() - 86400000).toDateString();
+          if (state.lastActiveDate !== today && state.lastActiveDate !== yesterday) {
+            state.streak = 1;
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to parse localStorage data:', err);
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem('fp_settings', JSON.stringify(state.settings));
+        localStorage.setItem('fp_tasks', JSON.stringify(state.tasks));
+        localStorage.setItem('fp_stats', JSON.stringify({
+          completed: state.totalCompletedPomodoros,
+          focusMinutes: state.totalFocusMinutes,
+          streak: state.streak,
+          lastDate: state.lastActiveDate
+        }));
+      } catch (err) {
+        console.warn('Failed to save to localStorage:', err);
+      }
+    }
+
+    const timeDisplay = document.getElementById('timeDisplay');
+    const timerLabel = document.getElementById('timerLabel');
+    const progressCircle = document.getElementById('progressCircle');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playIcon = document.getElementById('playIcon');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const playPauseText = document.getElementById('playPauseText');
+    const resetBtn = document.getElementById('resetBtn');
+    const skipBtn = document.getElementById('skipBtn');
+    const modeTabs = document.querySelectorAll('.mode-tab');
+    const modeIconBadge = document.getElementById('modeIconBadge');
+    const timerGlow = document.getElementById('timerGlow');
+    const cycleDots = document.getElementById('cycleDots');
+    const sessionCounter = document.getElementById('sessionCounter');
+    const activeTaskDisplay = document.getElementById('activeTaskDisplay');
+    const activeTaskText = document.getElementById('activeTaskText');
+    const streakBadge = document.getElementById('streakBadge');
+    const streakCount = document.getElementById('streakCount');
+    const statsStreakCount = document.getElementById('statsStreakCount');
+    const totalFocusMinutesEl = document.getElementById('totalFocusMinutes');
+    const totalPomosCount = document.getElementById('totalPomosCount');
+    const subStatusText = document.getElementById('subStatusText');
+    
+    // Tasks UI
+    const taskCountBadge = document.getElementById('taskCountBadge');
+    const addTaskTrigger = document.getElementById('addTaskTrigger');
+    const taskForm = document.getElementById('taskForm');
+    const cancelTaskBtn = document.getElementById('cancelTaskBtn');
+    const taskTitleInput = document.getElementById('taskTitleInput');
+    const taskEstInput = document.getElementById('taskEstInput');
+    const taskList = document.getElementById('taskList');
+    const emptyTaskState = document.getElementById('emptyTaskState');
+
+    // Drawer and Modal
+    const ambientBtn = document.getElementById('ambientBtn');
+    const ambientDrawer = document.getElementById('ambientDrawer');
+    const closeAmbientBtn = document.getElementById('closeAmbientBtn');
+    const ambientOptions = document.querySelectorAll('.ambient-option');
+    const ambientVolume = document.getElementById('ambientVolume');
+    const ambientVolumeLabel = document.getElementById('ambientVolumeLabel');
+    const ambientIndicator = document.getElementById('ambientIndicator');
+
+    const wakeLockBtn = document.getElementById('wakeLockBtn');
+    const wakeLockIcon = document.getElementById('wakeLockIcon');
+
+    const settingsModal = document.getElementById('settingsModal');
+    const openSettingsBtn = document.getElementById('openSettingsBtn');
+    const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    const reqNotificationBtn = document.getElementById('reqNotificationBtn');
+
+    // Settings inputs
+    const settingFocusTime = document.getElementById('settingFocusTime');
+    const settingShortBreakTime = document.getElementById('settingShortBreakTime');
+    const settingLongBreakTime = document.getElementById('settingLongBreakTime');
+    const settingAutoBreaks = document.getElementById('settingAutoBreaks');
+    const settingAutoPomodoros = document.getElementById('settingAutoPomodoros');
+    const settingVibrate = document.getElementById('settingVibrate');
+    const settingTicking = document.getElementById('settingTicking');
+
+    const packageModal = document.getElementById('packageModal');
+    const packageModalBtn = document.getElementById('packageModalBtn');
+    const closePackageBtn = document.getElementById('closePackageBtn');
+    const downloadZipDirectBtn = document.getElementById('downloadZipDirectBtn');
+    const downloadZipSpinner = document.getElementById('downloadZipSpinner');
+    const downloadZipIcon = document.getElementById('downloadZipIcon');
+    const toggleReadmePreviewBtn = document.getElementById('toggleReadmePreviewBtn');
+    const readmePreviewContainer = document.getElementById('readmePreviewContainer');
+    const readmeContentBlock = document.getElementById('readmeContentBlock');
+    const copyReadmeBtn = document.getElementById('copyReadmeBtn');
+    const previewIconCanvas = document.getElementById('previewIconCanvas');
+
+    // Toast
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
+    const toastIcon = document.getElementById('toastIcon');
+
+    const CIRCUMFERENCE = 2 * Math.PI * 110; // ~691.15
+
+    function showToast(message, icon = '✨') {
+      toastMsg.textContent = message;
+      toastIcon.textContent = icon;
+      toast.classList.remove('opacity-0');
+      toast.classList.add('opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0');
+      }, 2600);
+    }
+
+    function triggerHaptic(pattern = [60, 40, 60]) {
+      if (state.settings.vibrate && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate(pattern);
+        } catch (e) {}
+      }
+    }
+
+    /* Screen Wake Lock API for Mobile phone usability */
+    async function toggleWakeLock() {
+      if (!('wakeLock' in navigator) || !state.wakeLockSupported) {
+        showToast('Wake Lock is restricted in this browser or iframe', '⚠️');
+        return;
+      }
+      try {
+        if (state.wakeLockSentinel) {
+          await state.wakeLockSentinel.release();
+          state.wakeLockSentinel = null;
+          wakeLockIcon.classList.remove('text-amber-400');
+          wakeLockIcon.classList.add('text-slate-400');
+          showToast('Screen wake lock released', '💤');
+        } else {
+          state.wakeLockSentinel = await navigator.wakeLock.request('screen');
+          wakeLockIcon.classList.remove('text-slate-400');
+          wakeLockIcon.classList.add('text-amber-400');
+          showToast('Keep screen awake active', '💡');
+
+          state.wakeLockSentinel.addEventListener('release', () => {
+            state.wakeLockSentinel = null;
+            wakeLockIcon.classList.remove('text-amber-400');
+            wakeLockIcon.classList.add('text-slate-400');
+          });
+        }
+      } catch (err) {
+        state.wakeLockSentinel = null;
+        wakeLockIcon.classList.remove('text-amber-400');
+        wakeLockIcon.classList.add('text-slate-400');
+        if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+          state.wakeLockSupported = false;
+          showToast('Wake Lock disallowed by sandbox permissions policy', '⚠️');
+        } else {
+          showToast('Screen wake lock unavailable', '⚠️');
+        }
+      }
+    }
+
+    const MODE_CONFIG = {
+      pomodoro: {
+        label: 'Focus Session',
+        sub: 'Deep work & study',
+        color: '#ef4444',
+        btnBg: 'bg-red-600',
+        btnHover: 'hover:bg-red-500',
+        btnShadow: 'shadow-red-600/30',
+        badgeBg: 'bg-red-500/20',
+        badgeText: 'text-red-400',
+        badgeRing: 'ring-red-500/30',
+        glow: 'rgba(239, 68, 68, 0.25)',
+        ringColor: '#ef4444',
+        textClass: 'text-red-400'
+      },
+      shortBreak: {
+        label: 'Short Break',
+        sub: 'Rest, hydrate & stretch',
+        color: '#10b981',
+        btnBg: 'bg-emerald-600',
+        btnHover: 'hover:bg-emerald-500',
+        btnShadow: 'shadow-emerald-600/30',
+        badgeBg: 'bg-emerald-500/20',
+        badgeText: 'text-emerald-400',
+        badgeRing: 'ring-emerald-500/30',
+        glow: 'rgba(16, 185, 129, 0.25)',
+        ringColor: '#10b981',
+        textClass: 'text-emerald-400'
+      },
+      longBreak: {
+        label: 'Long Break',
+        sub: 'Relax & recharge fully',
+        color: '#3b82f6',
+        btnBg: 'bg-blue-600',
+        btnHover: 'hover:bg-blue-500',
+        btnShadow: 'shadow-blue-600/30',
+        badgeBg: 'bg-blue-500/20',
+        badgeText: 'text-blue-400',
+        badgeRing: 'ring-blue-500/30',
+        glow: 'rgba(59, 130, 246, 0.25)',
+        ringColor: '#3b82f6',
+        textClass: 'text-blue-400'
+      }
+    };
+
+    function setMode(mode, autoStart = false) {
+      state.mode = mode;
+      pauseTimer();
+
+      const conf = MODE_CONFIG[mode];
+      let minutes = state.settings.focusTime;
+      if (mode === 'shortBreak') minutes = state.settings.shortBreakTime;
+      if (mode === 'longBreak') minutes = state.settings.longBreakTime;
+
+      state.totalDuration = minutes * 60;
+      state.timeLeft = state.totalDuration;
+
+      // Update mode buttons UI
+      modeTabs.forEach(tab => {
+        const isSelected = tab.dataset.mode === mode;
+        if (isSelected) {
+          tab.className = `mode-tab flex-1 py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 text-white ${conf.btnBg} shadow-sm`;
+        } else {
+          tab.className = 'mode-tab flex-1 py-2.5 px-3 text-xs sm:text-sm font-medium rounded-xl text-slate-400 hover:text-slate-200 transition-all duration-200';
+        }
+      });
+
+      // Update Theme accents
+      timerLabel.textContent = conf.label;
+      timerLabel.className = `text-xs tracking-wider uppercase font-bold ${conf.textClass} mb-1 transition-colors`;
+      subStatusText.textContent = conf.sub;
+      progressCircle.setAttribute('stroke', conf.ringColor);
+      timerGlow.style.backgroundColor = conf.glow;
+
+      // Update play button styling
+      playPauseBtn.className = `px-9 py-4 rounded-2xl ${conf.btnBg} ${conf.btnHover} active:scale-95 text-white font-bold text-lg flex items-center gap-3 shadow-lg ${conf.btnShadow} transition duration-150`;
+
+      // Update icon badge
+      modeIconBadge.className = `w-9 h-9 rounded-xl ${conf.badgeBg} ${conf.badgeText} flex items-center justify-center ring-1 ${conf.badgeRing} transition-all duration-300`;
+
+      updateTimerDisplay();
+      updateProgress();
+
+      if (autoStart) {
+        startTimer();
+      }
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function updateTimerDisplay() {
+      const formatted = formatTime(state.timeLeft);
+      timeDisplay.textContent = formatted;
+      document.title = `${formatted} • ${MODE_CONFIG[state.mode].label} | FocusPulse`;
+    }
+
+    function updateProgress() {
+      const fraction = state.timeLeft / state.totalDuration;
+      const offset = CIRCUMFERENCE * (1 - fraction);
+      progressCircle.style.strokeDashoffset = offset;
+    }
+
+    function updateCycleDots() {
+      cycleDots.innerHTML = '';
+      const totalRounds = state.settings.longBreakInterval || 4;
+      
+      for (let i = 1; i <= totalRounds; i++) {
+        const dot = document.createElement('div');
+        if (i < state.currentCycle) {
+          // Completed in current round
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-red-500/20';
+        } else if (i === state.currentCycle) {
+          // Active
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-red-400 ring-2 ring-red-400/50 animate-pulse';
+        } else {
+          // Upcoming
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-800';
+        }
+        cycleDots.appendChild(dot);
+      }
+
+      sessionCounter.textContent = `#${state.currentCycle}`;
+    }
+
+    function startTimer() {
+      sound.init();
+      state.isRunning = true;
+      playIcon.classList.add('hidden');
+      pauseIcon.classList.remove('hidden');
+      playPauseText.textContent = 'Pause';
+
+      // Keep screen on if feature supported and permitted
+      if (!state.wakeLockSentinel && state.wakeLockSupported && 'wakeLock' in navigator) {
+        navigator.wakeLock.request('screen').then(sentinel => {
+          state.wakeLockSentinel = sentinel;
+          wakeLockIcon.classList.remove('text-slate-400');
+          wakeLockIcon.classList.add('text-amber-400');
+        }).catch((err) => {
+          if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+            state.wakeLockSupported = false;
+          }
+        });
+      }
+
+      state.intervalId = setInterval(() => {
+        if (state.timeLeft > 0) {
+          state.timeLeft--;
+          updateTimerDisplay();
+          updateProgress();
+          sound.playTick();
+        } else {
+          handleSessionCompletion();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      state.isRunning = false;
+      playIcon.classList.remove('hidden');
+      pauseIcon.classList.add('hidden');
+      playPauseText.textContent = 'Start';
+      if (state.intervalId) {
+        clearInterval(state.intervalId);
+        state.intervalId = null;
+      }
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      triggerHaptic([40]);
+      let mins = state.settings.focusTime;
+      if (state.mode === 'shortBreak') mins = state.settings.shortBreakTime;
+      if (state.mode === 'longBreak') mins = state.settings.longBreakTime;
+      state.totalDuration = mins * 60;
+      state.timeLeft = state.totalDuration;
+      updateTimerDisplay();
+      updateProgress();
+      showToast('Timer reset', '🔄');
+    }
+
+    function handleSessionCompletion() {
+      pauseTimer();
+      sound.playBell();
+      triggerHaptic([200, 100, 200, 100, 400]);
+
+      // Fire browser notification
+      if (Notification.permission === 'granted') {
+        const title = state.mode === 'pomodoro' ? 'Focus Session Done!' : 'Break Finished!';
+        const body = state.mode === 'pomodoro' 
+          ? 'Great job! Time to take a restorative breath.' 
+          : 'Ready to dive back into deep work?';
+        new Notification(title, { body, icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍅</text></svg>' });
+      }
+
+      if (state.mode === 'pomodoro') {
+        state.totalCompletedPomodoros++;
+        state.totalFocusMinutes += state.settings.focusTime;
+
+        // Check if an active task exists
+        if (state.activeTaskId) {
+          const task = state.tasks.find(t => t.id === state.activeTaskId);
+          if (task) {
+            task.completed = (task.completed || 0) + 1;
+            renderTasks();
+          }
+        }
+
+        // Streak check
+        const today = new Date().toDateString();
+        if (state.lastActiveDate !== today) {
+          state.streak++;
+          state.lastActiveDate = today;
+        }
+
+        updateStatsUI();
+        saveState();
+
+        // Decide next break
+        if (state.currentCycle >= state.settings.longBreakInterval) {
+          state.currentCycle = 1;
+          updateCycleDots();
+          showToast('4 Pomodoros done! Take a long break!', '🎉');
+          setMode('longBreak', state.settings.autoStartBreaks);
+        } else {
+          state.currentCycle++;
+          updateCycleDots();
+          showToast('Focus session done! Take a short break.', '☕');
+          setMode('shortBreak', state.settings.autoStartBreaks);
+        }
+      } else {
+        // Break completed, switch back to pomodoro
+        showToast('Break over! Time to focus.', '💪');
+        setMode('pomodoro', state.settings.autoStartPomodoros);
+      }
+    }
+
+    function skipSession() {
+      triggerHaptic([60]);
+      if (state.mode === 'pomodoro') {
+        if (state.currentCycle >= state.settings.longBreakInterval) {
+          state.currentCycle = 1;
+          setMode('longBreak', false);
+        } else {
+          state.currentCycle++;
+          setMode('shortBreak', false);
+        }
+      } else {
+        setMode('pomodoro', false);
+      }
+      updateCycleDots();
+      showToast('Skipped to next session', '⏭️');
+    }
+
+    function updateStatsUI() {
+      const hours = Math.floor(state.totalFocusMinutes / 60);
+      const mins = state.totalFocusMinutes % 60;
+      totalFocusMinutesEl.textContent = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+      totalPomosCount.textContent = state.totalCompletedPomodoros;
+      statsStreakCount.textContent = `${state.streak}d`;
+      streakCount.textContent = state.streak;
+    }
+
+    function renderTasks() {
+      taskList.innerHTML = '';
+      taskCountBadge.textContent = state.tasks.length;
+
+      if (state.tasks.length === 0) {
+        taskList.appendChild(emptyTaskState);
+        emptyTaskState.classList.remove('hidden');
+        activeTaskText.textContent = 'Select a task';
+        return;
+      }
+
+      emptyTaskState.classList.add('hidden');
+
+      state.tasks.forEach(task => {
+        const isActive = task.id === state.activeTaskId;
+        const taskCard = document.createElement('div');
+        taskCard.className = `p-3 rounded-2xl border transition flex items-center justify-between gap-3 ${
+          isActive 
+            ? 'bg-red-500/10 border-red-500/40 ring-1 ring-red-500/30' 
+            : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+        }`;
+
+        taskCard.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
+            <button class="toggle-done p-1 text-slate-500 hover:text-emerald-400 transition" data-id="${task.id}">
+              ${task.done 
+                ? '<svg class="w-5 h-5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>'
+                : '<div class="w-4 h-4 rounded-full border-2 border-slate-600 hover:border-red-400"></div>'
+              }
+            </button>
+            <div class="select-task min-w-0 flex-1" data-id="${task.id}">
+              <p class="text-xs sm:text-sm font-semibold truncate ${task.done ? 'line-through text-slate-500' : 'text-slate-200'}">
+                ${escapeHtml(task.title)}
+              </p>
+              <div class="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
+                <span>🍅 ${task.completed || 0}/${task.estimated || 1}</span>
+                ${isActive ? '<span class="text-red-400 font-bold ml-1">• Active</span>' : ''}
+              </div>
+            </div>
+          </div>
+          <button class="delete-task p-1.5 text-slate-500 hover:text-red-400 rounded-lg transition" data-id="${task.id}" title="Delete task">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        `;
+
+        taskList.appendChild(taskCard);
+      });
+
+      // Update active task header preview
+      const currentActive = state.tasks.find(t => t.id === state.activeTaskId);
+      if (currentActive) {
+        activeTaskText.textContent = currentActive.title;
+      } else {
+        activeTaskText.textContent = 'Select a task';
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    playPauseBtn.addEventListener('click', () => {
+      triggerHaptic([30]);
+      if (state.isRunning) {
+        pauseTimer();
+      } else {
+        startTimer();
+      }
+    });
+
+    resetBtn.addEventListener('click', resetTimer);
+    skipBtn.addEventListener('click', skipSession);
+
+    modeTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        triggerHaptic([30]);
+        setMode(tab.dataset.mode, false);
+      });
+    });
+
+    wakeLockBtn.addEventListener('click', toggleWakeLock);
+
+    // Task submission
+    addTaskTrigger.addEventListener('click', () => {
+      taskForm.classList.remove('hidden');
+      taskForm.classList.add('flex');
+      taskTitleInput.focus();
+    });
+
+    cancelTaskBtn.addEventListener('click', () => {
+      taskForm.classList.add('hidden');
+      taskForm.classList.remove('flex');
+      taskTitleInput.value = '';
+    });
+
+    taskForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const title = taskTitleInput.value.trim();
+      const estimated = parseInt(taskEstInput.value, 10) || 1;
+      if (!title) return;
+
+      const newTask = {
+        id: 'task_' + Date.now(),
+        title,
+        estimated,
+        completed: 0,
+        done: false
+      };
+
+      state.tasks.unshift(newTask);
+      if (!state.activeTaskId) state.activeTaskId = newTask.id;
+
+      taskTitleInput.value = '';
+      taskForm.classList.add('hidden');
+      taskForm.classList.remove('flex');
+
+      saveState();
+      renderTasks();
+      triggerHaptic([40]);
+      showToast('Task added!', '📝');
+    });
+
+    // Task List event delegation
+    taskList.addEventListener('click', (e) => {
+      const deleteBtn = e.target.closest('.delete-task');
+      if (deleteBtn) {
+        const id = deleteBtn.dataset.id;
+        state.tasks = state.tasks.filter(t => t.id !== id);
+        if (state.activeTaskId === id) {
+          state.activeTaskId = state.tasks.length ? state.tasks[0].id : null;
+        }
+        saveState();
+        renderTasks();
+        triggerHaptic([30]);
+        return;
+      }
+
+      const toggleDone = e.target.closest('.toggle-done');
+      if (toggleDone) {
+        const id = toggleDone.dataset.id;
+        const task = state.tasks.find(t => t.id === id);
+        if (task) {
+          task.done = !task.done;
+          saveState();
+          renderTasks();
+          triggerHaptic([50]);
+        }
+        return;
+      }
+
+      const selectArea = e.target.closest('.select-task');
+      if (selectArea) {
+        const id = selectArea.dataset.id;
+        state.activeTaskId = id;
+        saveState();
+        renderTasks();
+        triggerHaptic([30]);
+        showToast('Active task set', '🎯');
+      }
+    });
+
+    activeTaskDisplay.addEventListener('click', () => {
+      addTaskTrigger.scrollIntoView({ behavior: 'smooth' });
+      taskForm.classList.remove('hidden');
+      taskForm.classList.add('flex');
+      taskTitleInput.focus();
+    });
+
+    ambientBtn.addEventListener('click', () => {
+      sound.init();
+      ambientDrawer.classList.remove('hidden');
+    });
+
+    closeAmbientBtn.addEventListener('click', () => {
+      ambientDrawer.classList.add('hidden');
+    });
+
+    ambientDrawer.addEventListener('click', (e) => {
+      if (e.target === ambientDrawer) ambientDrawer.classList.add('hidden');
+    });
+
+    ambientOptions.forEach(opt => {
+      opt.addEventListener('click', () => {
+        const soundType = opt.dataset.sound;
+        sound.setAmbient(soundType, state.settings.ambientVolume);
+
+        ambientOptions.forEach(b => {
+          if (b.dataset.sound === soundType) {
+            b.className = 'ambient-option py-3 px-3 rounded-xl border border-emerald-500/80 bg-emerald-500/10 text-xs font-semibold text-emerald-300 flex items-center justify-center gap-2 active:scale-95';
+          } else {
+            b.className = 'ambient-option py-3 px-3 rounded-xl border border-slate-800 bg-slate-950 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-2 active:scale-95';
+          }
+        });
+
+        if (soundType !== 'none') {
+          ambientIndicator.classList.remove('hidden');
+          showToast(`Playing ${opt.textContent.trim()}`, '🎧');
+        } else {
+          ambientIndicator.classList.add('hidden');
+          showToast('Ambient audio off', '🔇');
+        }
+      });
+    });
+
+    ambientVolume.addEventListener('input', (e) => {
+      const val = e.target.value / 100;
+      state.settings.ambientVolume = val;
+      ambientVolumeLabel.textContent = `${e.target.value}%`;
+      sound.setAmbientVolume(val);
+      saveState();
+    });
+
+    openSettingsBtn.addEventListener('click', () => {
+      settingFocusTime.value = state.settings.focusTime;
+      settingShortBreakTime.value = state.settings.shortBreakTime;
+      settingLongBreakTime.value = state.settings.longBreakTime;
+      settingAutoBreaks.checked = state.settings.autoStartBreaks;
+      settingAutoPomodoros.checked = state.settings.autoStartPomodoros;
+      settingVibrate.checked = state.settings.vibrate;
+      settingTicking.checked = state.settings.ticking;
+
+      settingsModal.classList.remove('hidden');
+    });
+
+    closeSettingsBtn.addEventListener('click', () => {
+      settingsModal.classList.add('hidden');
+    });
+
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) settingsModal.classList.add('hidden');
+    });
+
+    saveSettingsBtn.addEventListener('click', () => {
+      state.settings.focusTime = Math.max(1, parseInt(settingFocusTime.value, 10) || 25);
+      state.settings.shortBreakTime = Math.max(1, parseInt(settingShortBreakTime.value, 10) || 5);
+      state.settings.longBreakTime = Math.max(1, parseInt(settingLongBreakTime.value, 10) || 15);
+      state.settings.autoStartBreaks = settingAutoBreaks.checked;
+      state.settings.autoStartPomodoros = settingAutoPomodoros.checked;
+      state.settings.vibrate = settingVibrate.checked;
+      state.settings.ticking = settingTicking.checked;
+
+      saveState();
+      settingsModal.classList.add('hidden');
+
+      if (!state.isRunning) {
+        setMode(state.mode, false);
+      }
+      updateCycleDots();
+      showToast('Settings saved!', '⚙️');
+    });
+
+    reqNotificationBtn.addEventListener('click', async () => {
+      if (!('Notification' in window)) {
+        showToast('Notifications not supported', '⚠️');
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        reqNotificationBtn.textContent = 'Granted ✓';
+        reqNotificationBtn.disabled = true;
+        showToast('Notifications enabled!', '🔔');
+      } else {
+        showToast('Notifications permission denied', '🚫');
+      }
+    });
+
+    const SVG_FAVICON_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <radialGradient id="tomatoGrad" cx="42%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#ff5e5e"/>
+      <stop offset="60%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#b91c1c"/>
+    </radialGradient>
+    <radialGradient id="highlightGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Tomato Shape -->
+  <ellipse cx="50" cy="58" rx="38" ry="33" fill="url(#tomatoGrad)"/>
+  <ellipse cx="36" cy="42" rx="14" ry="8" transform="rotate(-45 36 42)" fill="url(#highlightGrad)"/>
+  <!-- Stem and Leaves -->
+  <path d="M48 28 C46 17 54 15 54 15 C51 21 52 28 52 28 Z" fill="#10b981"/>
+  <path d="M50 28 C34 21 28 27 28 27 C37 33 50 29 50 29 Z" fill="#10b981"/>
+  <path d="M50 28 C66 21 72 27 72 27 C63 33 50 29 50 29 Z" fill="#10b981"/>
+  <path d="M48 28 C50 34 52 28 52 28 Z" fill="#059669"/>
+  <!-- Heartbeat Pulse Waveform -->
+  <path d="M22 59 L36 59 L42 47 L48 69 L54 52 L60 62 L64 59 L78 59" fill="none" stroke="#ffffff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="54" cy="52" r="2.8" fill="#ffffff"/>
+</svg>`;
+
+    const MANIFEST_CONTENT = JSON.stringify({
+      name: "FocusPulse Pomodoro Timer",
+      short_name: "FocusPulse",
+      description: "Minimalist, mobile-first Pomodoro timer with procedural ambient soundscapes and task tracking.",
+      start_url: "./index.html",
+      display: "standalone",
+      background_color: "#020617",
+      theme_color: "#ef4444",
+      orientation: "portrait-primary",
+      icons: [
+        { src: "favicon-16x16.png", sizes: "16x16", type: "image/png" },
+        { src: "favicon-32x32.png", sizes: "32x32", type: "image/png" },
+        { src: "apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+        { src: "android-chrome-192x192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+        { src: "android-chrome-512x512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+      ]
+    }, null, 2);
+
+    const README_CONTENT = `# FocusPulse — Pomodoro Timer & Focus Companion
+
+> A minimalist, responsive, mobile-first Pomodoro web application featuring procedural Web Audio soundscapes, screen wake-lock, task management, and offline PWA capability.
+
+---
+
+## 🌟 Features
+
+- **🍅 Classic Pomodoro Cycles**: 25 min focus / 5 min short break / 15 min long break with dynamic round tracker dots.
+- **📱 Mobile-First & Touch Optimized**: Generous tap targets, haptic feedback (\`navigator.vibrate\`), and iPhone notch/safe-area spacing.
+- **💡 Screen Wake Lock**: Keeps smartphone screens awake during study sessions to prevent premature sleep lock.
+- **🎧 Synthesized Ambient Audio**: Zero external audio downloads required; procedural audio generated in real-time via the Web Audio API:
+  - Harmonious 528Hz Solfeggio singing bowl session bell
+  - Deep Brownian noise
+  - Soothing rain wash
+  - 432Hz calming drone
+  - Optional clock tick
+- **📝 Task Management**: Track active tasks, estimate required pomodoros, and tick off completed goals.
+- **📊 Daily Productivity Stats**: Focus minute counter, total completed sessions, and daily streak tracking stored in \`localStorage\`.
+
+---
+
+## 📦 Included Favicons & Brand Assets
+
+This asset pack includes full high-resolution icons for all devices:
+
+| File | Resolution | Target Platform / Purpose |
+| :--- | :--- | :--- |
+| \`favicon.svg\` | Scalable Vector | Modern desktop & mobile browsers |
+| \`favicon.ico\` | 32×32 PNG container | Legacy browsers & fallback tabs |
+| \`favicon-16x16.png\` | 16×16 px | Standard browser tab icon |
+| \`favicon-32x32.png\` | 32×32 px | High-DPI browser tab icon |
+| \`apple-touch-icon.png\` | 180×180 px | iOS Home Screen shortcut & bookmark |
+| \`android-chrome-192x192.png\` | 192×192 px | Android home screen icon |
+| \`android-chrome-512x512.png\` | 512×512 px | PWA splash screen & app install prompt |
+| \`site.webmanifest\` | JSON metadata | Web app manifest for PWA installability |
+
+---
+
+## 🚀 Setup & Deployment
+
+FocusPulse is completely self-contained in a single HTML file with no build steps or node packages required.
+
+### 1. Linking Favicons in HTML Head
+Ensure your \`<head>\` section links the assets:
+\`\`\`html
+<!-- Favicons -->
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#ef4444">
+\`\`\`
+
+### 2. Local Preview
+Open \`index.html\` directly in any browser, or run a local server:
+\`\`\`bash
+# Python 3
+python3 -m http.server 8000
+\`\`\`
+Then visit \`http://localhost:8000\`.
+
+### 3. Deploy to GitHub Pages / Vercel / Netlify
+Simply place \`index.html\`, \`site.webmanifest\`, and the favicon images into the root of your repository and publish.
+
+---
+
+## 📲 Install as an App on Phone (PWA)
+
+- **iPhone (iOS Safari)**:
+  1. Open the website in Safari.
+  2. Tap the **Share** button (box with upward arrow).
+  3. Select **Add to Home Screen**.
+- **Android (Chrome)**:
+  1. Open the website in Chrome.
+  2. Tap the three dots menu in the top right.
+  3. Tap **Install app** or **Add to Home screen**.
+
+---
+
+## 📄 License
+MIT License. Free to use, modify, and distribute.
+`;
+
+    function drawFocusPulseIcon(ctx, size) {
+      ctx.clearRect(0, 0, size, size);
+      const scale = size / 100;
+      ctx.save();
+      ctx.scale(scale, scale);
+
+      // Maskable rounded background for 180px, 192px and 512px app icons
+      if (size >= 180) {
+        const bgGrad = ctx.createLinearGradient(0, 0, 100, 100);
+        bgGrad.addColorStop(0, '#0f172a');
+        bgGrad.addColorStop(1, '#020617');
+        ctx.fillStyle = bgGrad;
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(0, 0, 100, 100, 22);
+        } else {
+          ctx.rect(0, 0, 100, 100);
+        }
+        ctx.fill();
+      }
+
+      // Tomato body with radiant depth
+      const grad = ctx.createRadialGradient(42, 45, 8, 50, 58, 48);
+      grad.addColorStop(0, '#ff5e5e');
+      grad.addColorStop(0.6, '#ef4444');
+      grad.addColorStop(1, '#b91c1c');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(50, 58, 38, 33, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Top-left glossy highlight
+      const hlGrad = ctx.createRadialGradient(34, 40, 2, 34, 40, 16);
+      hlGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
+      hlGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = hlGrad;
+      ctx.beginPath();
+      ctx.ellipse(36, 42, 14, 8, -Math.PI / 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Stem and green leaves
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.moveTo(48, 28);
+      ctx.quadraticCurveTo(46, 17, 54, 15);
+      ctx.quadraticCurveTo(51, 21, 52, 28);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(50, 28);
+      ctx.quadraticCurveTo(34, 21, 28, 27);
+      ctx.quadraticCurveTo(37, 33, 50, 29);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(50, 28);
+      ctx.quadraticCurveTo(66, 21, 72, 27);
+      ctx.quadraticCurveTo(63, 33, 50, 29);
+      ctx.closePath();
+      ctx.fill();
+
+      // Cardiogram / Pulse waveform
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(3.4, 3.4);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(22, 59);
+      ctx.lineTo(36, 59);
+      ctx.lineTo(42, 47);
+      ctx.lineTo(48, 69);
+      ctx.lineTo(54, 52);
+      ctx.lineTo(60, 62);
+      ctx.lineTo(64, 59);
+      ctx.lineTo(78, 59);
+      ctx.stroke();
+
+      // Pulse dot
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(54, 52, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function renderIconBlob(size) {
+      return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        drawFocusPulseIcon(ctx, size);
+        canvas.toBlob((blob) => resolve(blob), 'image/png');
+      });
+    }
+
+    async function generateAndDownloadZip() {
+      if (typeof JSZip === 'undefined') {
+        showToast('JSZip library loading, please wait...', '⏳');
+        return;
+      }
+
+      downloadZipDirectBtn.disabled = true;
+      downloadZipSpinner.classList.remove('hidden');
+      downloadZipIcon.classList.add('hidden');
+      showToast('Rendering favicons & creating ZIP...', '📦');
+
+      try {
+        const zip = new JSZip();
+
+        // 1. Text assets
+        zip.file("README.md", README_CONTENT);
+        zip.file("site.webmanifest", MANIFEST_CONTENT);
+        zip.file("favicon.svg", SVG_FAVICON_CONTENT);
+        zip.file("index.html", document.documentElement.outerHTML);
+
+        // 2. High-res raster PNG favicons
+        const iconSpecs = [
+          { name: 'favicon-16x16.png', size: 16 },
+          { name: 'favicon-32x32.png', size: 32 },
+          { name: 'apple-touch-icon.png', size: 180 },
+          { name: 'android-chrome-192x192.png', size: 192 },
+          { name: 'android-chrome-512x512.png', size: 512 }
+        ];
+
+        for (const spec of iconSpecs) {
+          const blob = await renderIconBlob(spec.size);
+          zip.file(spec.name, blob);
+        }
+
+        // Standard 32x32 favicon.ico
+        const icoBlob = await renderIconBlob(32);
+        zip.file("favicon.ico", icoBlob);
+
+        // 3. Generate binary zip blob
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const downloadUrl = URL.createObjectURL(zipBlob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = 'focuspulse-assets.zip';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+        showToast('Asset ZIP downloaded successfully!', '🎉');
+      } catch (err) {
+        console.error('ZIP generation failed:', err);
+        showToast('Error generating ZIP package', '⚠️');
+      } finally {
+        downloadZipDirectBtn.disabled = false;
+        downloadZipSpinner.classList.add('hidden');
+        downloadZipIcon.classList.remove('hidden');
+      }
+    }
+
+    packageModalBtn.addEventListener('click', () => {
+      // Draw canvas preview
+      if (previewIconCanvas) {
+        const pCtx = previewIconCanvas.getContext('2d');
+        drawFocusPulseIcon(pCtx, 48);
+      }
+      readmeContentBlock.textContent = README_CONTENT;
+      packageModal.classList.remove('hidden');
+    });
+
+    closePackageBtn.addEventListener('click', () => {
+      packageModal.classList.add('hidden');
+    });
+
+    packageModal.addEventListener('click', (e) => {
+      if (e.target === packageModal) packageModal.classList.add('hidden');
+    });
+
+    downloadZipDirectBtn.addEventListener('click', generateAndDownloadZip);
+
+    toggleReadmePreviewBtn.addEventListener('click', () => {
+      readmePreviewContainer.classList.toggle('hidden');
+      readmePreviewContainer.classList.toggle('flex');
+    });
+
+    copyReadmeBtn.addEventListener('click', () => {
+      const textarea = document.createElement('textarea');
+      textarea.value = README_CONTENT;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('README copied to clipboard!', '📋');
+      } catch (err) {
+        showToast('Copy failed, please select manually', '⚠️');
+      }
+      document.body.removeChild(textarea);
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      // Re-acquire wake lock if page returns to visibility and timer is running
+      if (document.visibilityState === 'visible' && state.isRunning && !state.wakeLockSentinel && state.wakeLockSupported && 'wakeLock' in navigator) {
+        navigator.wakeLock.request('screen').then(sentinel => {
+          state.wakeLockSentinel = sentinel;
+          wakeLockIcon.classList.remove('text-slate-400');
+          wakeLockIcon.classList.add('text-amber-400');
+        }).catch((err) => {
+          if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+            state.wakeLockSupported = false;
+          }
+        });
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      // Pre-check Permissions Policy to avoid throwing in sandboxed environments
+      try {
+        if (!('wakeLock' in navigator)) {
+          state.wakeLockSupported = false;
+        } else if (document.permissionsPolicy && typeof document.permissionsPolicy.allowsFeature === 'function') {
+          state.wakeLockSupported = document.permissionsPolicy.allowsFeature('screen-wake-lock');
+        } else if (document.featurePolicy && typeof document.featurePolicy.allowsFeature === 'function') {
+          state.wakeLockSupported = document.featurePolicy.allowsFeature('screen-wake-lock');
+        }
+      } catch (e) {
+        // Fall back to runtime detection
+      }
+
+      loadPersistedData();
+      updateStatsUI();
+      updateCycleDots();
+      renderTasks();
+      setMode('pomodoro', false);
+
+      if (Notification.permission === 'granted') {
+        reqNotificationBtn.textContent = 'Granted ✓';
+        reqNotificationBtn.disabled = true;
+      }
+    });
+  </script>
+</body>
+</html>
