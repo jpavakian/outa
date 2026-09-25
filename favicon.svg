@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <radialGradient id="tomatoGrad" cx="42%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#ff5e5e"/>
+      <stop offset="60%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#b91c1c"/>
+    </radialGradient>
+    <radialGradient id="highlightGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="58" rx="38" ry="33" fill="url(#tomatoGrad)"/>
+  <ellipse cx="36" cy="42" rx="14" ry="8" transform="rotate(-45 36 42)" fill="url(#highlightGrad)"/>
+  <path d="M48 28 C46 17 54 15 54 15 C51 21 52 28 52 28 Z" fill="#10b981"/>
+  <path d="M50 28 C34 21 28 27 28 27 C37 33 50 29 50 29 Z" fill="#10b981"/>
+  <path d="M50 28 C66 21 72 27 72 27 C63 33 50 29 50 29 Z" fill="#10b981"/>
+  <path d="M48 28 C50 34 52 28 52 28 Z" fill="#059669"/>
+  <path d="M22 59 L36 59 L42 47 L48 69 L54 52 L60 62 L64 59 L78 59" fill="none" stroke="#ffffff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="54" cy="52" r="2.8" fill="#ffffff"/>
+</svg>
